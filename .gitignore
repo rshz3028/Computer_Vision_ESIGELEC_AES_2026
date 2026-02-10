@@ -1,0 +1,19 @@
+# Build output
+/build
+/build/
+
+# Compiled files
+*.exe
+*.o
+*.obj
+
+# OpenCV binaries / extracted SDK
+opencv/
+
+# IDE/editor
+.vscode/
+.idea/
+
+# OS junk
+Thumbs.db
+.DS_Store
