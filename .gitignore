@@ -17,3 +17,9 @@ opencv/
 # OS junk
 Thumbs.db
 .DS_Store
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
