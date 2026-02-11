@@ -27,7 +27,7 @@ def sanitize_nickname(s: str) -> str:
     return s[:20]
 
 def resources_dir_path():
-    return os.environ.get("RESOURCES_DIR", "resources")
+    return r"D:/MSc/Sem 2/Computer Vision/resources"
 
 def score_file_path():
     return os.path.join(resources_dir_path(), "scores.csv")
@@ -43,6 +43,32 @@ def append_score(name: str, score: int):
             w.writerow([name, score, now_timestamp()])
     except Exception as e:
         print("WARN: Could not write scores file:", score_file_path(), e)
+
+# ---------------- background music (pygame) ----------------
+def start_bg_music(music_path: str, volume: float = 0.35):
+    """
+    Plays background music in a loop (non-blocking).
+    volume: 0.0 to 1.0
+    """
+    try:
+        import pygame
+        pygame.mixer.init()
+        pygame.mixer.music.load(music_path)
+        pygame.mixer.music.set_volume(max(0.0, min(1.0, volume)))
+        pygame.mixer.music.play(-1)  # loop forever
+        return True
+    except Exception as e:
+        print("WARN: Could not start background music:", e)
+        return False
+
+def stop_bg_music():
+    try:
+        import pygame
+        pygame.mixer.music.stop()
+        pygame.mixer.quit()
+    except:
+        pass
+
 
 def load_scores_sorted():
     entries = []
@@ -160,7 +186,7 @@ def main():
     nickname = sanitize_nickname(input("Enter nickname: "))
 
     # IMPORTANT: model file path
-    MODEL_PATH = r"D:/MSc/Sem 2/Computer Vision/models/hand_landmarker.task"
+    MODEL_PATH = r"D:/MSc/Sem 2/Computer Vision/resources/models/hand_landmarker.task"
     if not os.path.exists(MODEL_PATH):
         print("ERROR: Missing model file:", MODEL_PATH)
         print("Download it to that path, then run again.")
@@ -175,6 +201,15 @@ def main():
         return
 
     cv2.namedWindow("Game", cv2.WINDOW_AUTOSIZE)
+
+    # Background music path (put your file here)
+    MUSIC_PATH = os.path.join(resources_dir_path(), "music", "The Rush.mp3")
+
+    music_ok = False
+    if os.path.exists(MUSIC_PATH):
+        music_ok = start_bg_music(MUSIC_PATH, volume=0.35)
+    else:
+        print("WARN: Missing music file:", MUSIC_PATH)
 
     tracker = IndexTipTracker(model_path=MODEL_PATH, max_num_hands=1)
 
@@ -306,6 +341,8 @@ def main():
     cv2.imshow("Game", final)
     cv2.waitKey(0)
 
+    stop_bg_music()
+    
     tracker.close()
     cap.release()
     cv2.destroyAllWindows()
