@@ -44,32 +44,6 @@ def append_score(name: str, score: int):
     except Exception as e:
         print("WARN: Could not write scores file:", score_file_path(), e)
 
-# ---------------- background music (pygame) ----------------
-def start_bg_music(music_path: str, volume: float = 0.35):
-    """
-    Plays background music in a loop (non-blocking).
-    volume: 0.0 to 1.0
-    """
-    try:
-        import pygame
-        pygame.mixer.init()
-        pygame.mixer.music.load(music_path)
-        pygame.mixer.music.set_volume(max(0.0, min(1.0, volume)))
-        pygame.mixer.music.play(-1)  # loop forever
-        return True
-    except Exception as e:
-        print("WARN: Could not start background music:", e)
-        return False
-
-def stop_bg_music():
-    try:
-        import pygame
-        pygame.mixer.music.stop()
-        pygame.mixer.quit()
-    except:
-        pass
-
-
 def load_scores_sorted():
     entries = []
     try:
@@ -108,6 +82,31 @@ def dist2(ax, ay, bx, by):
     dx = ax - bx
     dy = ay - by
     return dx * dx + dy * dy
+
+# ---------------- background music (pygame) ----------------
+def start_bg_music(music_path: str, volume: float = 0.35):
+    """
+    Plays background music in a loop (non-blocking).
+    volume: 0.0 to 1.0
+    """
+    try:
+        import pygame
+        pygame.mixer.init()
+        pygame.mixer.music.load(music_path)
+        pygame.mixer.music.set_volume(max(0.0, min(1.0, volume)))
+        pygame.mixer.music.play(-1)  # loop forever
+        return True
+    except Exception as e:
+        print("WARN: Could not start background music:", e)
+        return False
+
+def stop_bg_music():
+    try:
+        import pygame
+        pygame.mixer.music.stop()
+        pygame.mixer.quit()
+    except:
+        pass
 
 # ---------------- balloons ----------------
 def bright_color():
@@ -201,13 +200,13 @@ def main():
         return
 
     cv2.namedWindow("Game", cv2.WINDOW_AUTOSIZE)
+    cv2.namedWindow("Camera", cv2.WINDOW_AUTOSIZE)  # second window
 
     # Background music path (put your file here)
     MUSIC_PATH = os.path.join(resources_dir_path(), "music", "The Rush.mp3")
 
-    music_ok = False
     if os.path.exists(MUSIC_PATH):
-        music_ok = start_bg_music(MUSIC_PATH, volume=0.35)
+        start_bg_music(MUSIC_PATH, volume=0.35)
     else:
         print("WARN: Missing music file:", MUSIC_PATH)
 
@@ -249,6 +248,20 @@ def main():
         if mirror_display:
             frame = cv2.flip(frame, 1)
 
+        # frame already flipped -> mirror=False
+        has_c, (cx, cy) = tracker.get_index_tip(frame, mirror=False)
+
+        # ---------- Camera window (video stream + fingertip marker) ----------
+        cam_vis = frame.copy()
+        if has_c:
+            cv2.circle(cam_vis, (cx, cy), 10, (0, 255, 0), -1, cv2.LINE_AA)
+            cv2.circle(cam_vis, (cx, cy), 10, (255, 255, 255), 2, cv2.LINE_AA)
+            draw_text_outlined(cam_vis, f"Tip: ({cx},{cy})", (10, 30), 0.8, 2, (0, 0, 0), (255, 255, 255))
+        else:
+            draw_text_outlined(cam_vis, "No hand", (10, 30), 0.8, 2, (0, 0, 0), (255, 255, 255))
+        cv2.imshow("Camera", cam_vis)
+
+        # ---------- Spawn / move balloons ----------
         if len(balloons) < max_balloons and random.random() < spawn_prob:
             balloons.append(random_balloon(W, H))
 
@@ -258,11 +271,9 @@ def main():
 
         balloons = [b for b in balloons if not out_of_bounds(b, W, H)]
 
-        # frame already flipped -> mirror=False
-        has_c, (cx, cy) = tracker.get_index_tip(frame, mirror=False)
-
         ui = np.full((H, W, 3), bg_color, dtype=np.uint8)
 
+        # ---------- Game interaction ----------
         if has_c:
             if not has_smooth:
                 smooth_x, smooth_y = float(cx), float(cy)
@@ -305,11 +316,13 @@ def main():
             has_prev = False
             has_smooth = False
 
+        # ---------- Draw balloons ----------
         for b in balloons:
             p = (int(round(b.x)), int(round(b.y)))
             cv2.circle(ui, p, b.r, b.color, -1, cv2.LINE_AA)
             cv2.circle(ui, p, b.r, (255, 255, 255), 2, cv2.LINE_AA)
 
+        # ---------- HUD ----------
         draw_text_outlined(ui, f"Player: {nickname}", (10, 30), 0.8, 2, (0, 0, 0), (255, 255, 255))
         draw_text_outlined(ui, f"Score: {score}", (10, 60), 0.9, 2, (0, 0, 0), (255, 255, 255))
         draw_text_outlined(ui, f"Time: {int(max(0.0, remaining))}", (10, 90), 0.9, 2, (0, 0, 0), (255, 255, 255))
@@ -342,7 +355,6 @@ def main():
     cv2.waitKey(0)
 
     stop_bg_music()
-    
     tracker.close()
     cap.release()
     cv2.destroyAllWindows()

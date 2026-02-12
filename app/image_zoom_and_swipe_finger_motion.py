@@ -9,7 +9,7 @@ from mediapipe.tasks.python import vision as mp_vision
 
 # -------- Settings --------
 IMAGE_DIR = r"D:/MSc/Sem 2/Computer Vision/resources/parsing"
-MODEL_PATH = r"D:/MSc/Sem 2/Computer Vision/models/hand_landmarker.task"
+MODEL_PATH = r"D:/MSc/Sem 2/Computer Vision/resources/models/hand_landmarker.task"
 MAX_IMAGES = 10
 WINDOW_NAME = "Swipe Gallery (q to quit)"
 

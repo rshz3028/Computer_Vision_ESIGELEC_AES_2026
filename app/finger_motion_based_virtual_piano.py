@@ -9,8 +9,8 @@ from mediapipe.tasks import python as mp_python
 from mediapipe.tasks.python import vision as mp_vision
 
 # ------------------ PATHS ------------------
-MODEL_PATH = r"D:/MSc/Sem 2/Computer Vision/models/hand_landmarker.task"
-SAMPLES_DIR = r"D:/MSc/Sem 2/Computer Vision/app/piano_samples"
+MODEL_PATH = r"D:/MSc/Sem 2/Computer Vision/resources/models/hand_landmarker.task"
+SAMPLES_DIR = r"D:/MSc/Sem 2/Computer Vision/resources/piano_samples"
 WINDOW_NAME = "Virtual Piano (Real Samples, Top) - q quit"
 
 # ------------------ PIANO (1 OCTAVE chromatic) ------------------

@@ -26,12 +26,15 @@ CLICK_COOLDOWN_S = 0.20
 # Map camera space -> screen space
 MARGIN = 0.02  # normalized margin on each side (0..0.3)
 
-# Pinch thresholds (normalized distances in MediaPipe coords)
-PINCH_ON = 0.040
-PINCH_OFF = 0.055
+# ---- Pinch detection (IMPROVED) ----
+# We use a ratio: dist(thumb_tip, index_tip) / hand_scale
+# This adapts to hand size & camera distance.
+PINCH_ON = 0.22
+PINCH_OFF = 0.28
 
 # Click timing (for "tap" pinch)
-CLICK_MAX_HOLD_S = 0.9   # pinch held less than this => click
+CLICK_MIN_HOLD_S = 0.05   # debounce accidental micro-pinches
+CLICK_MAX_HOLD_S = 0.90   # pinch held less than this => click
 
 # Drag mode: if True, pinch hold becomes click+drag (mouseDown while pinched)
 ENABLE_DRAG = True
@@ -76,6 +79,29 @@ def apply_margin(x, y, margin=MARGIN):
     x = (x - margin) / (1.0 - 2 * margin)
     y = (y - margin) / (1.0 - 2 * margin)
     return x, y
+
+
+# -------- Improved pinch helpers --------
+def hand_scale(lm):
+    # Stable reference length: wrist (0) to middle MCP (9)
+    return max(1e-6, norm_dist(lm[0], lm[9]))
+
+
+def pinch_ratio(lm):
+    # Scale-normalized pinch distance
+    return norm_dist(lm[4], lm[8]) / hand_scale(lm)
+
+
+def thumb_is_actively_pinching(lm):
+    """
+    Extra intent check to reduce false pinches:
+    Thumb tip (4) should be closer to index tip (8) than thumb IP (3) is.
+    That implies the thumb is folding in towards the index.
+    """
+    d_tip = norm_dist(lm[4], lm[8])
+    d_ip = norm_dist(lm[3], lm[8])
+    return d_tip < d_ip
+# ----------------------------------------
 
 
 def main():
@@ -129,6 +155,7 @@ def main():
 
         tip_px = None
         pinch_d = None
+        pinch_ok = False
         fscore = None
 
         if result.hand_landmarks and len(result.hand_landmarks) > 0:
@@ -169,8 +196,10 @@ def main():
 
             tip_px = (int(idx_tip.x * w), int(idx_tip.y * h))
 
-            # pinch detection
-            pinch_d = norm_dist(lm[4], lm[8])
+            # ---- Improved pinch detection (ratio + intent check) ----
+            pinch_d = pinch_ratio(lm)                # normalized distance
+            pinch_ok = thumb_is_actively_pinching(lm)
+            # --------------------------------------------------------
 
             # fist detection (score + hysteresis)
             fscore = fist_score(lm)
@@ -194,12 +223,12 @@ def main():
             pinched = False
         else:
             # pinch hysteresis transitions
-            if (not pinched) and (pinch_d <= PINCH_ON):
+            if (not pinched) and pinch_ok and (pinch_d <= PINCH_ON):
                 pinched = True
                 pinch_start_t = now
 
-            elif pinched and (pinch_d >= PINCH_OFF):
-                # pinch released: decide click vs end-drag
+            elif pinched and ((pinch_d >= PINCH_OFF) or (not pinch_ok)):
+                # pinch released (or thumb intent lost): decide click vs end-drag
                 held = now - pinch_start_t
                 pinched = False
 
@@ -207,8 +236,8 @@ def main():
                     pyautogui.mouseUp()
                     dragging = False
                 else:
-                    # click only if it was a quick pinch
-                    if held <= CLICK_MAX_HOLD_S and (now - last_click_t) >= CLICK_COOLDOWN_S:
+                    # click only if it was a real quick pinch
+                    if (CLICK_MIN_HOLD_S <= held <= CLICK_MAX_HOLD_S) and ((now - last_click_t) >= CLICK_COOLDOWN_S):
                         pyautogui.click()
                         last_click_t = now
 
@@ -228,7 +257,7 @@ def main():
                         (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
 
             if pinch_d is not None:
-                cv2.putText(frame, f"pinch: {pinch_d:.3f}  pinched:{pinched} drag:{dragging}",
+                cv2.putText(frame, f"pinch_ratio: {pinch_d:.3f} ok:{pinch_ok} pinched:{pinched} drag:{dragging}",
                             (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
             if fscore is not None:
                 cv2.putText(frame, f"fist_score: {fscore:.3f}",
